@@ -16,13 +16,36 @@ import re
 # Press the green button in the gutter to run the script.
 
 
-def get_languages():
+def add_and_commit_to_repo(repo, file_name):
+    dir_path = os.path.dirname(os.path.realpath(__file__))
+    print(dir_path)
+    new_name = dir_path + '/' + file_name
+    new_name = re.sub('/', '\\\\', new_name)
+    repo.index.add(new_name)
+    repo.index.commit(' content changed')
+    repo.remotes.origin.push()
+
+
+def write_to_file(file, what_to_write):
+    f = open(file, "w+", encoding="utf-8")
+    f.write(what_to_write)
+    f.close()
+
+
+def get_languages(repo, git_folder):
     link = 'http://localhost/mediawiki/api.php?action=parse&page=Languages&format=json'
     result = requests.get(link, verify=False)
     decoded_result = json.loads(result.text)
     res = decoded_result['parse']['text']['*']
     languages_items = re.findall(r'<li>(.*)<\/li>', res)
-    return extract_languages(languages_items)
+    extracted = extract_languages(languages_items)
+    serialized = json.dumps(extracted)
+    file_name = git_folder + '/Languages.json'
+    file_exists = path.exists(file_name)
+    write_to_file(file_name, serialized)
+    if not file_exists:
+        add_and_commit_to_repo(repo, file_name)
+    return extracted
 
 
 def extract_languages(list_to_change):
@@ -32,13 +55,20 @@ def extract_languages(list_to_change):
     return list_to_change
 
 
-def get_resources():
+def get_resources(repo, git_folder):
     link = 'http://localhost/mediawiki/api.php?action=parse&page=Resources&format=json'
     result = requests.get(link, verify=False)
     decoded_result = json.loads(result.text)
     res = decoded_result['parse']['text']['*']
     resources_items = re.findall(r'<a(.*)>(.*)<\/a>', res)
-    return extract_resources(resources_items)
+    extracted = extract_resources(resources_items)
+    serialized = json.dumps(extracted)
+    file_name = git_folder + '/Resources.json'
+    file_exists = path.exists(file_name)
+    write_to_file(file_name, serialized)
+    if not file_exists:
+        add_and_commit_to_repo(repo, file_name)
+    return extracted
 
 
 def extract_resources(list_to_change):
@@ -87,8 +117,7 @@ def create_language_folders(repo, shortcuts):
             os.makedirs(repo + '/' + short)
 
 
-def work_with_repo(resources_list, shortcuts):
-    repo = get_repo()
+def work_with_repo(repo, resources_list, shortcuts):
     create_language_folders('ResourcesTest-https', shortcuts)
     new_files = list()
     for shortcut in shortcuts:
@@ -107,14 +136,15 @@ def work_with_repo(resources_list, shortcuts):
                     new_files.append(new_name)
 
     changed_files = [item.a_path for item in repo.index.diff(None)]
+    print('Changed:')
     print(changed_files)
     for file in changed_files:
         repo.index.add(file)
-        repo.index.commit(file + ' content changed')
+        repo.index.commit(' content changed')
     print(new_files)
     for file in new_files:
         repo.index.add(file)
-        repo.index.commit(file + ' content changed')
+        repo.index.commit(' content changed')
     repo.remotes.origin.push()
 
 
@@ -125,11 +155,12 @@ if __name__ == '__main__':
     # print('after page')
     # print(page.text)
     #work_with_repo()
-    languages = get_languages()
+    repository = get_repo()
+    languages = get_languages(repository, 'ResourcesTest-https')
     print(languages)
     shorts = ['en', 'cs']
-    resources = get_resources()
+    resources = get_resources(repository, 'ResourcesTest-https')
     print(resources)
-    work_with_repo(resources, shorts)
+    work_with_repo(repository, resources, shorts)
 
 # See PyCharm help at https://www.jetbrains.com/help/pycharm/
