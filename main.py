@@ -15,6 +15,8 @@ import re
 
 # Press the green button in the gutter to run the script.
 
+languages_with_resources = dict()
+
 
 def add_and_commit_to_repo(repo, file_name):
     dir_path = os.path.dirname(os.path.realpath(__file__))
@@ -89,6 +91,14 @@ def get_html_text(resource, language):
     result = requests.get(link, verify=False)
     decoded_result = json.loads(result.text)
     resource_name = "ResourcesTest-https/"+language+"/" + resource + ".html"
+    print(resource_name)
+    if language in languages_with_resources:
+        if len(languages_with_resources[language]) == 0:
+            languages_with_resources[language][0] = resource
+        else:
+            languages_with_resources[language].append(resource)
+    else:
+        languages_with_resources[language] = [resource]
     file_exists = path.exists(resource_name)
     f = open(resource_name, "w+", encoding="utf-8")
     res = decoded_result['parse']['text']['*']
@@ -145,6 +155,9 @@ def work_with_repo(repo, resources_list, shortcuts):
     for file in new_files:
         repo.index.add(file)
         repo.index.commit(' content changed')
+    serialized = json.dumps(languages_with_resources)
+    write_to_file('ResourcesTest-https/LanguagesWithResources.json',serialized)
+    add_and_commit_to_repo(repo, 'ResourcesTest-https/LanguagesWithResources.json')
     repo.remotes.origin.push()
 
 
@@ -156,11 +169,13 @@ if __name__ == '__main__':
     # print(page.text)
     #work_with_repo()
     repository = get_repo()
+    print('got repo')
     languages = get_languages(repository, 'ResourcesTest-https')
     print(languages)
     shorts = ['en', 'cs']
     resources = get_resources(repository, 'ResourcesTest-https')
     print(resources)
     work_with_repo(repository, resources, shorts)
+    print(languages_with_resources)
 
 # See PyCharm help at https://www.jetbrains.com/help/pycharm/
