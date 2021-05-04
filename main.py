@@ -2,6 +2,8 @@
 
 # Press Shift+F10 to execute it or replace it with your code.
 # Press Double Shift to search everywhere for classes, files, tool windows, actions, and settings.
+import base64
+
 import pywikibot
 import requests
 import json
@@ -80,6 +82,10 @@ def extract_resources(list_to_change):
     return result
 
 
+def get_base64_img(url):
+    return base64.b64encode(requests.get(url).content).decode('utf-8')
+
+
 def get_html_text(resource, language):
     link = ""
     if language != 'en':
@@ -91,7 +97,6 @@ def get_html_text(resource, language):
     result = requests.get(link, verify=False)
     decoded_result = json.loads(result.text)
     resource_name = "ResourcesTest-https/"+language+"/" + resource + ".html"
-    print(resource_name)
     if language in languages_with_resources:
         if len(languages_with_resources[language]) == 0:
             languages_with_resources[language][0] = resource
@@ -102,6 +107,17 @@ def get_html_text(resource, language):
     file_exists = path.exists(resource_name)
     f = open(resource_name, "w+", encoding="utf-8")
     res = decoded_result['parse']['text']['*']
+    img = re.findall(r'src=\"(.*)\" decoding', res)
+    print('img:')
+    print(img)
+    for i in img:
+        if '.png' in i:
+            url = " http://localhost" + i
+            base64img = get_base64_img(url)
+            print(resource_name)
+            print(type(base64img))
+            res = re.sub(i, "data:image/png;base64, " + base64img, res)
+            print(res)
     f.write(res)
     f.close()
     if not file_exists:
