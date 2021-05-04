@@ -174,6 +174,9 @@ def work_with_repo(repo, resources_list, shortcuts):
     serialized = json.dumps(languages_with_resources)
     write_to_file('ResourcesTest-https/LanguagesWithResources.json',serialized)
     add_and_commit_to_repo(repo, 'ResourcesTest-https/LanguagesWithResources.json')
+    all_changes = changed_files + new_files
+    write_to_file('ResourcesTest-https/Changes.json', json.dumps(all_changes))
+    add_and_commit_to_repo(repo, 'ResourcesTest-https/Changes.json')
     repo.remotes.origin.push()
 
 
