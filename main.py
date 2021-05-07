@@ -3,7 +3,6 @@
 # Press Shift+F10 to execute it or replace it with your code.
 # Press Double Shift to search everywhere for classes, files, tool windows, actions, and settings.
 import base64
-
 import requests
 import json
 import git
@@ -20,9 +19,8 @@ languages_with_resources = dict()
 
 def add_and_commit_to_repo(repo, file_name):
     dir_path = os.path.dirname(os.path.realpath(__file__))
-    print(dir_path)
-    new_name = dir_path + '/' + file_name
-    new_name = re.sub('/', '\\\\', new_name)
+    # print(dir_path)
+    new_name = os.path.join(dir_path, file_name)
     repo.index.add(new_name)
     repo.index.commit(' content changed')
     repo.remotes.origin.push()
@@ -107,16 +105,16 @@ def get_html_text(resource, language):
     res = decoded_result['parse']['text']['*']
     res = re.sub("<!--([\s\S]*?)-->", "", res)
     img = re.findall(r'src=\"(.*)\" decoding', res)
-    print('img:')
-    print(img)
+    # print('img:')
+    # print(img)
     for i in img:
         if '.png' in i:
             url = " http://localhost" + i
             base64img = get_base64_img(url)
-            print(resource_name)
-            print(type(base64img))
+            # print(resource_name)
+            # print(type(base64img))
             res = re.sub(i, "data:image/png;base64, " + base64img, res)
-            print(res)
+    # print(res)
     f.write(res)
     f.close()
     if not file_exists:
@@ -128,54 +126,145 @@ def get_html_text(resource, language):
 def get_repo():
     if not path.exists('ResourcesTest-https'):
         repo = git.Repo.clone_from('https://github.com/potocekn/ResourcesTest.git', 'ResourcesTest-https')
-        print('first time')
+        # print('first time')
     else:
         repo = git.Repo('ResourcesTest-https')
         repo.remotes.origin.pull()
-        print('second time')
+        # print('second time')
     return repo
 
 
 def create_language_folders(repo, shortcuts):
     for short in shortcuts:
-        if not os.path.exists(repo + '/' + short):
-            os.makedirs(repo + '/' + short)
+        if not os.path.exists(os.path.join(repo, short)):
+            os.makedirs(os.path.join(repo, short))
+
+
+def save_changes(file, changes):
+    f = open(file, "w+", encoding="utf-8")
+    f.write(json.dumps(changes))
+    f.close()
+
+
+def get_changes_for_language(repo, language, changed_files):
+    changes = list()
+    for file in changed_files:
+        if language in file:
+            repo.index.add(file)
+            changes.append(file)
+    return changes
+
+
+def get_rest_for_language(language, files, changes):
+    rest = list()
+    # print('changes from method')
+    # print(changes)
+    print('lwr from method')
+    print(files)
+    for file in files:
+        if (file not in changes) & (language + '/' in file):
+            rest.append(file)
+    # print('rest from method')
+    # print(rest)
+    return rest
+
+
+def get_previous_versions(file):
+    if os.path.exists(file):
+        f = open(file, "r", encoding="utf-8")
+        previous = json.load(f)
+        f.close()
+        return previous
+    else:
+        return []
+
+
+def get_versions(file, changes, rest):
+    versions = get_previous_versions(file)
+    # print('versions')
+    # print(type(versions))
+    # print(versions)
+    for file in changes:
+        was_found = False
+        if versions != [()]:
+            for item in versions:
+                # print('item: ')
+                # print(item)
+                if item != []:
+                    if file in item[0]:
+                        item[1] = item[1] + 1
+                        was_found = True
+                        break
+        else:
+            versions.append((file, 1))
+        if not was_found:
+            versions.append((file, 1))
+    for file in rest:
+        was_found = False
+        for item in versions:
+            if item != []:
+                if file in item[0]:
+                    was_found = True
+                    break
+        if not was_found:
+            versions.append((file, 1))
+    return versions
+
+
+def detect_changes(repo_name, repo, shortcuts, new_files, language_resources):
+    changed_files = [item.a_path for item in repo.index.diff(None)]
+    changed_files += new_files
+    # rest = [item for item in language_resources if item not in changed_files]
+    # print('Changed files')
+    # print(changed_files)
+    for shortcut in shortcuts:
+        changes = get_changes_for_language(repo, shortcut, changed_files)
+        # print('changes:')
+        # print(changes)
+        rest = get_rest_for_language(shortcut, language_resources, changes)
+        # print('rest')
+        # print(rest)
+        # changes = changes + rest
+        file = os.path.join(repo_name, shortcut, 'Changes.json')
+        # print('Changes file: ' + file)
+        changes_and_versions = get_versions(file, changes, rest)
+        # print(shortcut)
+        # print(changes_and_versions)
+        with open(file, 'w') as f:
+            json.dump(changes_and_versions, f)
+        add_and_commit_to_repo(repo, file)
+    repo.index.commit(' content changed')
 
 
 def work_with_repo(repo, resources_list, shortcuts):
     create_language_folders('ResourcesTest-https', shortcuts)
     new_files = list()
+    language_resources = list()
     for shortcut in shortcuts:
+        # new_files = list()
         for resource in resources_list:
             full_name = resource
             if shortcut != 'en':
                 full_name = full_name + '/' + shortcut
+            file_name = shortcut + '/' + resource + '.html'
+            # print(full_name)
             request = requests.get('http://localhost/mediawiki/index.php/' + full_name)
             if request.status_code == 200:
+                # print('exists' + full_name)
                 exists = get_html_text(resource, shortcut)
                 if exists != "":
                     dir_path = os.path.dirname(os.path.realpath(__file__))
-                    print(dir_path)
-                    new_name = dir_path + '/' + exists
-                    new_name = re.sub('/', '\\\\', new_name)
+                    # print(dir_path)
+                    new_name = os.path.join(dir_path, exists)
                     new_files.append(new_name)
-
-    changed_files = [item.a_path for item in repo.index.diff(None)]
-    print('Changed:')
-    print(changed_files)
-    for file in changed_files:
-        repo.index.add(file)
-        repo.index.commit(' content changed')
-    print(new_files)
-    for file in new_files:
-        repo.index.add(file)
-        repo.index.commit(' content changed')
+                    print('new name: ' + new_name)
+                language_resources.append(file_name)
     serialized = json.dumps(languages_with_resources)
     write_to_file('ResourcesTest-https/LanguagesWithResources.json', serialized)
     add_and_commit_to_repo(repo, 'ResourcesTest-https/LanguagesWithResources.json')
-    all_changes = changed_files + new_files
-    write_to_file('ResourcesTest-https/Changes.json', json.dumps(all_changes))
-    add_and_commit_to_repo(repo, 'ResourcesTest-https/Changes.json')
+    # print('lwr')
+    # print(language_resources)
+    detect_changes('ResourcesTest-https', repo, shortcuts,new_files, language_resources)
     repo.remotes.origin.push()
 
 
