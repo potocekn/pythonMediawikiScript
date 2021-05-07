@@ -4,17 +4,15 @@
 # Press Double Shift to search everywhere for classes, files, tool windows, actions, and settings.
 import base64
 
-import pywikibot
 import requests
 import json
 import git
-import os.path
+import os
 from os import path
 import re
 
 # pip install requests
 # needed to use requests and not piwikibot because of self signed certificate (authentication failed)
-
 # Press the green button in the gutter to run the script.
 
 languages_with_resources = dict()
@@ -89,14 +87,14 @@ def get_base64_img(url):
 def get_html_text(resource, language):
     link = ""
     if language != 'en':
-        link = 'http://localhost/mediawiki/api.php?action=parse&page='+resource+'/'+language+'&format=json'
+        link = 'http://localhost/mediawiki/api.php?action=parse&page=' + resource + '/' + language + '&format=json'
     else:
         link = 'http://localhost/mediawiki/api.php?action=parse&page=' + resource + '&format=json'
     # 'http://localhost/mediawiki/api.php?action=parse&page=Languages&format=json'
     # 'http://4training.net/mediawiki/api.php?action=parse&page=Prayer&format=json'
     result = requests.get(link, verify=False)
     decoded_result = json.loads(result.text)
-    resource_name = "ResourcesTest-https/"+language+"/" + resource + ".html"
+    resource_name = "ResourcesTest-https/" + language + "/" + resource + ".html"
     if language in languages_with_resources:
         if len(languages_with_resources[language]) == 0:
             languages_with_resources[language][0] = resource
@@ -107,6 +105,7 @@ def get_html_text(resource, language):
     file_exists = path.exists(resource_name)
     f = open(resource_name, "w+", encoding="utf-8")
     res = decoded_result['parse']['text']['*']
+    res = re.sub("<!--([\s\S]*?)-->", "", res)
     img = re.findall(r'src=\"(.*)\" decoding', res)
     print('img:')
     print(img)
@@ -172,7 +171,7 @@ def work_with_repo(repo, resources_list, shortcuts):
         repo.index.add(file)
         repo.index.commit(' content changed')
     serialized = json.dumps(languages_with_resources)
-    write_to_file('ResourcesTest-https/LanguagesWithResources.json',serialized)
+    write_to_file('ResourcesTest-https/LanguagesWithResources.json', serialized)
     add_and_commit_to_repo(repo, 'ResourcesTest-https/LanguagesWithResources.json')
     all_changes = changed_files + new_files
     write_to_file('ResourcesTest-https/Changes.json', json.dumps(all_changes))
@@ -181,12 +180,6 @@ def work_with_repo(repo, resources_list, shortcuts):
 
 
 if __name__ == '__main__':
-    # site = pywikibot.Site()
-    # print('after site')
-    # page = pywikibot.Page(site,'Languages')
-    # print('after page')
-    # print(page.text)
-    #work_with_repo()
     repository = get_repo()
     print('got repo')
     languages = get_languages(repository, 'ResourcesTest-https')
