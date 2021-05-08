@@ -114,6 +114,10 @@ def get_html_text(resource, language):
             # print(resource_name)
             # print(type(base64img))
             res = re.sub(i, "data:image/png;base64, " + base64img, res)
+        if '.jpeg' in i:
+            url = " http://localhost" + i
+            base64img = get_base64_img(url)
+            res = re.sub(i, "data:image/jpeg;base64, " + base64img, res)
     # print(res)
     f.write(res)
     f.close()
@@ -151,9 +155,11 @@ def get_changes_for_language(repo, language, changed_files):
     for file in changed_files:
         if language in file:
             dir_path = os.path.dirname(os.path.realpath(__file__))
-            full_name = os.path.join(dir_path, file)
+            full_name = os.path.join(dir_path,'ResourcesTest-https', file)
             repo.index.add(full_name)
             changes.append(file)
+    print(language + 'changes:')
+    print(changes)
     return changes
 
 
@@ -181,14 +187,11 @@ def get_previous_versions(file):
         return []
 
 
-def get_versions(file, changes, rest):
-    versions = get_previous_versions(file)
-    # print('versions')
-    # print(type(versions))
-    # print(versions)
+def handle_changes(versions, changes):
     for file in changes:
+        print(file)
         was_found = False
-        if versions != [()]:
+        if versions != []:
             for item in versions:
                 # print('item: ')
                 # print(item)
@@ -197,10 +200,14 @@ def get_versions(file, changes, rest):
                         item[1] = item[1] + 1
                         was_found = True
                         break
+            if not was_found:
+                versions.append((file, 1))
         else:
             versions.append((file, 1))
-        if not was_found:
-            versions.append((file, 1))
+    return versions
+
+
+def handle_rest(versions, rest):
     for file in rest:
         was_found = False
         for item in versions:
@@ -210,6 +217,19 @@ def get_versions(file, changes, rest):
                     break
         if not was_found:
             versions.append((file, 1))
+    return versions
+
+
+def get_versions(file, changes, rest):
+    versions = get_previous_versions(file)
+    print('versions previous')
+    print(versions)
+    versions = handle_changes(versions, changes)
+    print('versions changes')
+    print(versions)
+    versions = handle_rest(versions, rest)
+    print('versions rest')
+    print(versions)
     return versions
 
 
@@ -257,21 +277,17 @@ def work_with_repo(repo, resources_list, shortcuts):
                 if exists != "":
                     dir_path = os.path.dirname(os.path.realpath(__file__))
                     # print(dir_path)
-                    # new_name = os.path.join(dir_path, exists)
-                    new_files.append(exists)
+                    new_name = re.sub('ResourcesTest-https/', '', exists)
+                    new_files.append(new_name)
                     add_and_commit_to_repo(repo, os.path.join(dir_path, exists))
-                    print('new name: ' + exists)
+                    # print('new name: ' + shortcut + '/' + resource + '.html')
                 language_resources.append(file_name)
     serialized = json.dumps(languages_with_resources)
     write_to_file('ResourcesTest-https/LanguagesWithResources.json', serialized)
     add_and_commit_to_repo(repo, 'ResourcesTest-https/LanguagesWithResources.json')
     # print('lwr')
     # print(language_resources)
-    detect_changes('ResourcesTest-https', repo, shortcuts,new_files, language_resources)
-    changed_files = [item.a_path for item in repo.index.diff(None)]
-    for file in changed_files:
-        repo.index.add(file)
-        repo.index.commit(' content changed')
+    detect_changes('ResourcesTest-https', repo, shortcuts, new_files, language_resources)
     repo.remotes.origin.push()
 
 
@@ -285,5 +301,3 @@ if __name__ == '__main__':
     print(resources)
     work_with_repo(repository, resources, shorts)
     print(languages_with_resources)
-
-# See PyCharm help at https://www.jetbrains.com/help/pycharm/
