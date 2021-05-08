@@ -150,7 +150,9 @@ def get_changes_for_language(repo, language, changed_files):
     changes = list()
     for file in changed_files:
         if language in file:
-            repo.index.add(file)
+            dir_path = os.path.dirname(os.path.realpath(__file__))
+            full_name = os.path.join(dir_path, file)
+            repo.index.add(full_name)
             changes.append(file)
     return changes
 
@@ -215,8 +217,8 @@ def detect_changes(repo_name, repo, shortcuts, new_files, language_resources):
     changed_files = [item.a_path for item in repo.index.diff(None)]
     changed_files += new_files
     # rest = [item for item in language_resources if item not in changed_files]
-    # print('Changed files')
-    # print(changed_files)
+    print('Changed files')
+    print(changed_files)
     for shortcut in shortcuts:
         changes = get_changes_for_language(repo, shortcut, changed_files)
         # print('changes:')
@@ -255,9 +257,10 @@ def work_with_repo(repo, resources_list, shortcuts):
                 if exists != "":
                     dir_path = os.path.dirname(os.path.realpath(__file__))
                     # print(dir_path)
-                    new_name = os.path.join(dir_path, exists)
-                    new_files.append(new_name)
-                    print('new name: ' + new_name)
+                    # new_name = os.path.join(dir_path, exists)
+                    new_files.append(exists)
+                    add_and_commit_to_repo(repo, os.path.join(dir_path, exists))
+                    print('new name: ' + exists)
                 language_resources.append(file_name)
     serialized = json.dumps(languages_with_resources)
     write_to_file('ResourcesTest-https/LanguagesWithResources.json', serialized)
@@ -265,6 +268,10 @@ def work_with_repo(repo, resources_list, shortcuts):
     # print('lwr')
     # print(language_resources)
     detect_changes('ResourcesTest-https', repo, shortcuts,new_files, language_resources)
+    changed_files = [item.a_path for item in repo.index.diff(None)]
+    for file in changed_files:
+        repo.index.add(file)
+        repo.index.commit(' content changed')
     repo.remotes.origin.push()
 
 
@@ -273,7 +280,7 @@ if __name__ == '__main__':
     print('got repo')
     languages = get_languages(repository, 'ResourcesTest-https')
     print(languages)
-    shorts = ['en', 'cs']
+    shorts = ['en', 'cs', 'de']
     resources = get_resources(repository, 'ResourcesTest-https')
     print(resources)
     work_with_repo(repository, resources, shorts)
