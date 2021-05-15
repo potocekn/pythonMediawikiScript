@@ -3,8 +3,11 @@
 # Press Shift+F10 to execute it or replace it with your code.
 # Press Double Shift to search everywhere for classes, files, tool windows, actions, and settings.
 import base64
+import sys
 import requests
 import json
+from collections import namedtuple
+from json import JSONEncoder
 import git
 import os
 from os import path
@@ -15,17 +18,24 @@ import re
 # needed to use requests and not piwikibot because of self signed certificate (authentication failed)
 # Press the green button in the gutter to run the script.
 
-class Processor:
-    languages_with_resources = dict()
-    repo = None
-    repo_folder_name = None
-    repo_URL = None
-    resource_server = None
+class UserInfo:
+    repo_folder_name: str
+    repo_URL: str
+    resource_server: str
 
     def __init__(self, repo_folder_name, repo_url, resource_server):
         self.repo_folder_name = repo_folder_name
         self.repo_URL = repo_url
         self.resource_server = resource_server
+
+
+class Processor:
+    languages_with_resources = dict()
+    repo = None
+    userInfo = None
+
+    def __init__(self, user_info: UserInfo):
+        self.userInfo = user_info
 
     def add_and_commit_to_repo(self, file_name):
         dir_path = os.path.dirname(os.path.realpath(__file__))
@@ -41,14 +51,14 @@ class Processor:
         f.close()
 
     def get_languages(self):
-        link = 'http://' + self.resource_server + '/mediawiki/api.php?action=parse&page=Languages&format=json'
+        link = 'http://' + self.userInfo.resource_server + '/mediawiki/api.php?action=parse&page=Languages&format=json'
         result = requests.get(link, verify=False)
         decoded_result = json.loads(result.text)
         res = decoded_result['parse']['text']['*']
         languages_items = re.findall(r'<li>(.*)<\/li>', res)
         extracted = self.extract_languages(languages_items)
         serialized = json.dumps(extracted)
-        file_name = self.repo_folder_name + '/Languages.json'
+        file_name = self.userInfo.repo_folder_name + '/Languages.json'
         file_exists = path.exists(file_name)
         self.write_to_file(file_name, serialized)
         if not file_exists:
@@ -62,14 +72,14 @@ class Processor:
         return list_to_change
 
     def get_resources(self):
-        link = 'http://' + self.resource_server + '/mediawiki/api.php?action=parse&page=Resources&format=json'
+        link = 'http://' + self.userInfo.resource_server + '/mediawiki/api.php?action=parse&page=Resources&format=json'
         result = requests.get(link, verify=False)
         decoded_result = json.loads(result.text)
         res = decoded_result['parse']['text']['*']
         resources_items = re.findall(r'<a(.*)>(.*)<\/a>', res)
         extracted = self.extract_resources(resources_items)
         serialized = json.dumps(extracted)
-        file_name = self.repo_folder_name + '/Resources.json'
+        file_name = self.userInfo.repo_folder_name + '/Resources.json'
         file_exists = path.exists(file_name)
         self.write_to_file(file_name, serialized)
         if not file_exists:
@@ -88,16 +98,16 @@ class Processor:
     def get_html_text(self, resource, language):
         link = ""
         if language != 'en':
-            link = 'http://' + self.resource_server + '/mediawiki/api.php?action=parse&page=' + resource + '/' \
+            link = 'http://' + self.userInfo.resource_server + '/mediawiki/api.php?action=parse&page=' + resource + '/' \
                    + language + '&format=json'
         else:
-            link = 'http://' + self.resource_server + '/mediawiki/api.php?action=parse&page=' + resource \
+            link = 'http://' + self.userInfo.resource_server + '/mediawiki/api.php?action=parse&page=' + resource \
                    + '&format=json'
         # 'http://localhost/mediawiki/api.php?action=parse&page=Languages&format=json'
         # 'http://4training.net/mediawiki/api.php?action=parse&page=Prayer&format=json'
         result = requests.get(link, verify=False)
         decoded_result = json.loads(result.text)
-        resource_name = self.repo_folder_name + "/" + language + "/" + resource + ".html"
+        resource_name = self.userInfo.repo_folder_name + "/" + language + "/" + resource + ".html"
         if language in self.languages_with_resources:
             if len(self.languages_with_resources[language]) == 0:
                 self.languages_with_resources[language][0] = resource
@@ -113,7 +123,7 @@ class Processor:
         # print('img:')
         # print(img)
         for i in img:
-            url = 'http://' + self.resource_server + i
+            url = 'http://' + self.userInfo.resource_server + i
             base64img = self.get_base64_img(url)
             if '.png' in i:
                 # print(resource_name)
@@ -130,11 +140,11 @@ class Processor:
             return ""
 
     def get_repo(self):
-        if not path.exists(self.repo_folder_name):
-            repo = git.Repo.clone_from(self.repo_URL, self.repo_folder_name)
+        if not path.exists(self.userInfo.repo_folder_name):
+            repo = git.Repo.clone_from(self.userInfo.repo_URL, self.userInfo.repo_folder_name)
             # print('first time')
         else:
-            repo = git.Repo(self.repo_folder_name)
+            repo = git.Repo(self.userInfo.repo_folder_name)
             repo.remotes.origin.pull()
             # print('second time')
         return repo
@@ -154,7 +164,7 @@ class Processor:
         for file in changed_files:
             if language in file:
                 dir_path = os.path.dirname(os.path.realpath(__file__))
-                full_name = os.path.join(dir_path, self.repo_folder_name, file)
+                full_name = os.path.join(dir_path, self.userInfo.repo_folder_name, file)
                 self.repo.index.add(full_name)
                 changes.append(file)
         print(language + 'changes:')
@@ -240,7 +250,7 @@ class Processor:
             # print('rest')
             # print(rest)
             # changes = changes + rest
-            file = os.path.join(self.repo_folder_name, shortcut, 'Changes.json')
+            file = os.path.join(self.userInfo.repo_folder_name, shortcut, 'Changes.json')
             # print('Changes file: ' + file)
             changes_and_versions = self.get_versions(file, changes, rest)
             # print(shortcut)
@@ -262,21 +272,21 @@ class Processor:
                     full_name = full_name + '/' + shortcut
                 file_name = shortcut + '/' + resource + '.html'
                 # print(full_name)
-                request = requests.get('http://' + self.resource_server + '/mediawiki/index.php/' + full_name)
+                request = requests.get('http://' + self.userInfo.resource_server + '/mediawiki/index.php/' + full_name)
                 if request.status_code == 200:
                     # print('exists' + full_name)
                     exists = self.get_html_text(resource, shortcut)
                     if exists != "":
                         dir_path = os.path.dirname(os.path.realpath(__file__))
                         # print(dir_path)
-                        new_name = re.sub(self.repo_folder_name + '/', '', exists)
+                        new_name = re.sub(self.userInfo.repo_folder_name + '/', '', exists)
                         new_files.append(new_name)
                         self.add_and_commit_to_repo(os.path.join(dir_path, exists))
                         # print('new name: ' + shortcut + '/' + resource + '.html')
                     language_resources.append(file_name)
         serialized = json.dumps(self.languages_with_resources)
-        self.write_to_file(self.repo_folder_name + '/LanguagesWithResources.json', serialized)
-        self.add_and_commit_to_repo(self.repo_folder_name + '/LanguagesWithResources.json')
+        self.write_to_file(self.userInfo.repo_folder_name + '/LanguagesWithResources.json', serialized)
+        self.add_and_commit_to_repo(self.userInfo.repo_folder_name + '/LanguagesWithResources.json')
         # print('lwr')
         # print(language_resources)
         self.detect_changes(shortcuts, new_files, language_resources)
@@ -294,7 +304,35 @@ class Processor:
         print(self.languages_with_resources)
 
 
+class UserInfoEncoder(JSONEncoder):
+    def default(self, o):
+        return o.__dict__
+
+
+def custom_user_info_decoder(user_info_dict):
+    return namedtuple('X', user_info_dict.keys())(*user_info_dict.values())
+
+
+def read_form_file(file_name):
+    f = open(file_name, "r", encoding="utf-8")
+    result = f.read()
+    result = re.sub('\n', '', result)
+    f.close()
+    return result
+
+
 if __name__ == '__main__':
-    processor = Processor('ResourcesTest-https', 'https://github.com/potocekn/ResourcesTest.git', 'localhost')
-    processor.process_server_resources()
-    # repo url 'https://github.com/potocekn/ResourcesTest.git'
+    if len(sys.argv) == 2:
+        file = sys.argv[1]
+        res = read_form_file(file)
+        print(res)
+        user_info = json.loads(res, object_hook=custom_user_info_decoder)
+        print("info:")
+        print(type(user_info))
+        print(user_info.repo_URL)
+        processor = Processor(user_info)
+        processor.process_server_resources()       
+    else:
+        print("Wrong amount of args.")
+        f = open("config.json", "w+", encoding="utf-8")
+        f.close()
