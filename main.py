@@ -107,7 +107,7 @@ class Processor:
         # 'http://4training.net/mediawiki/api.php?action=parse&page=Prayer&format=json'
         result = requests.get(link, verify=False)
         decoded_result = json.loads(result.text)
-        resource_name = self.userInfo.repo_folder_name + "/" + language + "/" + resource + ".html"
+        resource_name = self.userInfo.repo_folder_name + "/" + language + "/HTML/" + resource + ".html"
         if language in self.languages_with_resources:
             if len(self.languages_with_resources[language]) == 0:
                 self.languages_with_resources[language][0] = resource
@@ -149,10 +149,19 @@ class Processor:
             # print('second time')
         return repo
 
+    def create_format_folder(self, language, format):
+        print("inside create format folder")
+        if not os.path.exists(os.path.join(language, format)):
+            os.makedirs(os.path.join(self.userInfo.repo_folder_name, language, format))
+
     def create_language_folders(self, shortcuts):
         for short in shortcuts:
-            if not os.path.exists(os.path.join(short)):
-                os.makedirs(os.path.join(short))
+            print("before create")
+            if not os.path.exists(os.path.join(self.userInfo.repo_folder_name, short)):
+                os.makedirs(os.path.join(self.userInfo.repo_folder_name, short))
+                self.create_format_folder(short, "HTML")
+                self.create_format_folder(short, "PDF")
+                self.create_format_folder(short, "ODT")
 
     def save_changes(self, file, changes):
         f = open(file, "w+", encoding="utf-8")
@@ -260,7 +269,7 @@ class Processor:
             self.add_and_commit_to_repo(file)
         self.repo.index.commit(' content changed')
 
-    def work_with_repo(self, resources_list, shortcuts):
+    def get_actual_html_files(self, resources_list, shortcuts):
         self.create_language_folders(shortcuts)
         new_files = list()
         language_resources = list()
@@ -270,7 +279,7 @@ class Processor:
                 full_name = resource
                 if shortcut != 'en':
                     full_name = full_name + '/' + shortcut
-                file_name = shortcut + '/' + resource + '.html'
+                file_name = shortcut + '/HTML/' + resource + '.html'
                 # print(full_name)
                 request = requests.get('http://' + self.userInfo.resource_server + '/mediawiki/index.php/' + full_name)
                 if request.status_code == 200:
@@ -292,6 +301,21 @@ class Processor:
         self.detect_changes(shortcuts, new_files, language_resources)
         self.repo.remotes.origin.push()
 
+    def save_file(self, content, language, format, name):
+        full_name = os.path.join(self.userInfo.repo_folder_name, language, format, name)
+        with open(full_name, 'wb') as f:
+            f.write(content)
+            self.add_and_commit_to_repo(full_name)
+
+    def get_actual_pdf_or_odt_files(self, url, resources_list, shortcuts, format, format_folder):
+        for resource in resources_list:
+            for shortcut in shortcuts:
+                file_name = resource + "-" + shortcut + format
+                full_path = url + file_name
+                request = requests.get(full_path)
+                if request.status_code == 200:
+                    self.save_file(request.content, shortcut, format_folder, file_name)
+
     def process_server_resources(self):
         self.repo = self.get_repo()
         print('got repo')
@@ -300,7 +324,10 @@ class Processor:
         shorts = ['en', 'cs', 'de']
         resources = self.get_resources()
         print(resources)
-        self.work_with_repo(resources, shorts)
+        self.get_actual_html_files(resources, shorts)
+        url = "http://" + self.userInfo.resource_server + "/mediawiki/index.php/Special:Filepath/"
+        self.get_actual_pdf_or_odt_files(url, resources, shorts, ".pdf", "PDF")
+        self.get_actual_pdf_or_odt_files(url, resources, shorts, ".odt", "ODT")
         print(self.languages_with_resources)
 
 
@@ -331,7 +358,7 @@ if __name__ == '__main__':
         print(type(user_info))
         print(user_info.repo_URL)
         processor = Processor(user_info)
-        processor.process_server_resources()       
+        processor.process_server_resources()
     else:
         print("Wrong amount of args.")
         f = open("config.json", "w+", encoding="utf-8")
