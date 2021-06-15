@@ -13,6 +13,7 @@ import os
 from os import path
 from iso639 import languages
 import re
+import http.client as httplib
 
 
 # pip install requests
@@ -38,7 +39,12 @@ class Processor:
     userInfo = None
 
     def __init__(self, user_info: UserInfo):
-        self.userInfo = user_info
+        if hasattr(user_info, 'repo_folder_name') \
+                & hasattr(user_info, 'repo_URL') \
+                & hasattr(user_info, 'resource_server'):
+            self.userInfo = user_info
+        else:
+            raise AttributeError()
 
     # Method used for adding and committing of new files or changed files to the repository.
     def add_and_commit_to_repo(self, file_name):
@@ -170,7 +176,10 @@ class Processor:
     # the repository is cloned in the folder that is specified in the user config file.
     def get_repo(self):
         if not path.exists(self.userInfo.repo_folder_name):
-            repo = git.Repo.clone_from(self.userInfo.repo_URL, self.userInfo.repo_folder_name)
+            try:
+                repo = git.Repo.clone_from(self.userInfo.repo_URL, self.userInfo.repo_folder_name)
+            except:
+                raise ConnectionError()
         else:
             repo = git.Repo(self.userInfo.repo_folder_name)
             repo.remotes.origin.pull()
@@ -267,24 +276,13 @@ class Processor:
     # Method that detects changes for each language and saves them in the Changes.json file in the language
     # folder in the git repo.
     def detect_changes(self, shortcuts, new_files, language_resources):
-        print("inside detect changes")
         changed_files = [item.a_path for item in self.repo.index.diff(None)]
-        print("before new files")
-        print(changed_files)
         changed_files += new_files
-        print("after new files")
-        print(changed_files)
         for shortcut in shortcuts:
             changes = self.get_changes_for_language(shortcut, changed_files)
             rest = self.get_rest_for_language(shortcut, language_resources, changes)
             file = os.path.join(self.userInfo.repo_folder_name, shortcut, 'Changes.json')
             changes_and_versions = self.get_versions(file, changes, rest)
-            print("changes: ")
-            print(changes)
-            print("rest: ")
-            print(rest)
-            print("ch&v: ")
-            print(changes_and_versions)
             with open(file, 'w') as f:
                 json.dump(changes_and_versions, f)
             self.add_and_commit_to_repo(file)
@@ -328,13 +326,21 @@ class Processor:
 
     # Method for downloading and saving the PDF and ODT files.
     def get_actual_pdf_or_odt_files(self, url, resources_list, shortcuts, format, format_folder):
+        print("inside download pdf/odt")
         for resource in resources_list:
             for shortcut in shortcuts:
                 file_name = resource + "-" + shortcut + format
                 full_path = url + file_name
+                print(full_path)
                 request = requests.get(full_path)
                 if request.status_code == 200:
+                    print("200 request")
                     self.save_file(request.content, shortcut, format_folder, file_name)
+        changed_files = [item.a_path for item in self.repo.index.diff(None)]
+        print(changed_files)
+        for f in changed_files:
+            full_file_name = os.path.join(self.userInfo.repo_folder_name, f)
+            self.add_and_commit_to_repo(full_file_name)
 
     def get_language_shortcuts(self, language_names):
         shortcuts = list()
@@ -343,20 +349,39 @@ class Processor:
             shortcuts.append(language_info.alpha2)
         return shortcuts
 
+    def has_internet(self):
+        conn = httplib.HTTPConnection(self.userInfo.resource_server, timeout=5)
+        try:
+            conn.request("HEAD", "/")
+            conn.close()
+            return True
+        except:
+            conn.close()
+            return False
+
     def process_server_resources(self):
-        self.repo = self.get_repo()
-        print('got repo')
+        try:
+            self.repo = self.get_repo()
+        except ConnectionError:
+            print("The online repository is currently unavailable.")
+            return
+        print('successfully got repository')
+        if not self.has_internet():
+            print("The mediawiki server is currently unavailable.")
+            return
+        print("Getting available languages ...")
         languages = self.get_languages()
-        print(languages)
         shorts = self.get_language_shortcuts(languages)
-        print(shorts)
+        print("Getting available resources ...")
         resources = self.get_resources()
-        print(resources)
+        print("Starting downloading the files ... ")
+        print("This may take a while ... ")
         self.get_actual_html_files(resources, shorts)
         url = "http://" + self.userInfo.resource_server + "/mediawiki/index.php/Special:Filepath/"
         self.get_actual_pdf_or_odt_files(url, resources, shorts, ".pdf", "PDF")
         self.get_actual_pdf_or_odt_files(url, resources, shorts, ".odt", "ODT")
         print(self.languages_with_resources)
+        print("Update successful!")
 
 
 class UserInfoEncoder(JSONEncoder):
@@ -376,18 +401,30 @@ def read_form_file(file_name):
     return result
 
 
-if __name__ == '__main__':
-    if len(sys.argv) == 2:
-        file = sys.argv[1]
+def main(argv):
+    if len(argv) == 2:
+        file = argv[1]
+        if not os.path.exists(file):
+            print("Non-existent config file!")
+            return
         res = read_form_file(file)
-        print(res)
-        user_info = json.loads(res, object_hook=custom_user_info_decoder)
-        print("info:")
-        print(type(user_info))
-        print(user_info.repo_URL)
-        processor = Processor(user_info)
-        processor.process_server_resources()
+        user_info = ""
+        try:
+            user_info = json.loads(res, object_hook=custom_user_info_decoder)
+        except:
+            print("Wrong format of the config file!")
+            return
+        try:
+            processor = Processor(user_info)
+            processor.process_server_resources()
+        except AttributeError:
+            print("Wrong internal structure of the config file!")
+        except ConnectionError:
+            print("The server is currently unavailable.")
+
     else:
         print("Wrong amount of args.")
-        f = open("config.json", "w+", encoding="utf-8")
-        f.close()
+
+
+if __name__ == '__main__':
+    main(sys.argv)
