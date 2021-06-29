@@ -1,7 +1,3 @@
-# This is a sample Python script.
-
-# Press Shift+F10 to execute it or replace it with your code.
-# Press Double Shift to search everywhere for classes, files, tool windows, actions, and settings.
 import base64
 import sys
 import requests
@@ -15,8 +11,6 @@ from iso639 import languages
 import re
 import http.client as httplib
 
-
-# pip install requests
 
 # A class that holds all necessary information from user configuration such as the URL to the github repository,
 # the mediawiki server URL and the name of the folder that contains the local git repository
@@ -235,8 +229,6 @@ class Processor:
     # is detected the version number is incremented by 1.
     def handle_changes(self, versions, changes):
         for file in changes:
-            print("inside handle changes")
-            print(file)
             was_found = False
             if versions != []:
                 for item in versions:
@@ -307,7 +299,6 @@ class Processor:
                     if exists != "":
                         dir_path = os.path.dirname(os.path.realpath(__file__))
                         new_name = re.sub(self.userInfo.repo_folder_name + '/', '', exists)
-                        print(new_name)
                         new_files.append(new_name)
                         self.add_and_commit_to_repo(os.path.join(dir_path, exists))
                     language_resources.append(file_name)
@@ -326,22 +317,19 @@ class Processor:
 
     # Method for downloading and saving the PDF and ODT files.
     def get_actual_pdf_or_odt_files(self, url, resources_list, shortcuts, format, format_folder):
-        print("inside download pdf/odt")
         for resource in resources_list:
             for shortcut in shortcuts:
                 file_name = resource + "-" + shortcut + format
                 full_path = url + file_name
-                print(full_path)
                 request = requests.get(full_path)
                 if request.status_code == 200:
-                    print("200 request")
                     self.save_file(request.content, shortcut, format_folder, file_name)
         changed_files = [item.a_path for item in self.repo.index.diff(None)]
-        print(changed_files)
         for f in changed_files:
             full_file_name = os.path.join(self.userInfo.repo_folder_name, f)
             self.add_and_commit_to_repo(full_file_name)
 
+    #Method for getting a list of shortcuts for the list of full language names.
     def get_language_shortcuts(self, language_names):
         shortcuts = list()
         for language in language_names:
@@ -349,6 +337,7 @@ class Processor:
             shortcuts.append(language_info.alpha2)
         return shortcuts
 
+    #Method to determine if there is an Internet connection.
     def has_internet(self):
         conn = httplib.HTTPConnection(self.userInfo.resource_server, timeout=5)
         try:
@@ -359,6 +348,7 @@ class Processor:
             conn.close()
             return False
 
+    #Method for processing the actual state of resources on the mediawiki server.
     def process_server_resources(self):
         try:
             self.repo = self.get_repo()
