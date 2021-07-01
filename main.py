@@ -329,7 +329,7 @@ class Processor:
             full_file_name = os.path.join(self.userInfo.repo_folder_name, f)
             self.add_and_commit_to_repo(full_file_name)
 
-    #Method for getting a list of shortcuts for the list of full language names.
+    # Method for getting a list of shortcuts from the list of full language names.
     def get_language_shortcuts(self, language_names):
         shortcuts = list()
         for language in language_names:
@@ -337,7 +337,7 @@ class Processor:
             shortcuts.append(language_info.alpha2)
         return shortcuts
 
-    #Method to determine if there is an Internet connection.
+    # Method to determine if there is an Internet connection.
     def has_internet(self):
         conn = httplib.HTTPConnection(self.userInfo.resource_server, timeout=5)
         try:
@@ -348,7 +348,7 @@ class Processor:
             conn.close()
             return False
 
-    #Method for processing the actual state of resources on the mediawiki server.
+    # Method for processing the actual state of resources on the mediawiki server.
     def process_server_resources(self):
         try:
             self.repo = self.get_repo()
@@ -383,7 +383,7 @@ def custom_user_info_decoder(user_info_dict):
     return namedtuple('X', user_info_dict.keys())(*user_info_dict.values())
 
 
-def read_form_file(file_name):
+def read_from_file(file_name):
     f = open(file_name, "r", encoding="utf-8")
     result = f.read()
     result = re.sub('\n', '', result)
@@ -397,7 +397,7 @@ def main(argv):
         if not os.path.exists(file):
             print("Non-existent config file!")
             return
-        res = read_form_file(file)
+        res = read_from_file(file)
         user_info = ""
         try:
             user_info = json.loads(res, object_hook=custom_user_info_decoder)
