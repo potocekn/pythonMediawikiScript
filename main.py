@@ -20,7 +20,8 @@ class UserInfo:
     resource_server: str
 
     def __init__(self, repo_folder_name, repo_url, resource_server):
-        self.repo_folder_name = repo_folder_name
+        dir_path = os.path.dirname(os.path.realpath(__file__))    
+        self.repo_folder_name = os.path.join(dir_path, repo_folder_name)
         self.repo_URL = repo_url
         self.resource_server = resource_server
 
@@ -43,7 +44,10 @@ class Processor:
     # Method used for adding and committing of new files or changed files to the repository.
     def add_and_commit_to_repo(self, file_name):
         dir_path = os.path.dirname(os.path.realpath(__file__))
+        print(dir_path)
         new_name = os.path.join(dir_path, file_name)
+        print(new_name)
+        print(self.repo)
         self.repo.index.add(new_name)
         self.repo.index.commit(' content changed')
         self.repo.remotes.origin.push()
@@ -65,7 +69,7 @@ class Processor:
             languages_items = re.findall(r'<li>(.*)<\/li>', res)
             extracted = self.extract_languages(languages_items)
             serialized = json.dumps(extracted)
-            file_name = self.userInfo.repo_folder_name + '/Languages.json'
+            file_name = os.path.join(self.userInfo.repo_folder_name, 'Languages.json')
             file_exists = path.exists(file_name)
             self.write_to_file(file_name, serialized)
             if not file_exists:
@@ -92,7 +96,7 @@ class Processor:
             resources_items = re.findall(r'<a(.*)>(.*)<\/a>', res)
             extracted = self.extract_resources(resources_items)
             serialized = json.dumps(extracted)
-            file_name = self.userInfo.repo_folder_name + '/Resources.json'
+            file_name = os.path.join(self.userInfo.repo_folder_name, 'Resources.json')
             file_exists = path.exists(file_name)
             self.write_to_file(file_name, serialized)
             if not file_exists:
@@ -303,8 +307,9 @@ class Processor:
                         self.add_and_commit_to_repo(os.path.join(dir_path, exists))
                     language_resources.append(file_name)
         serialized = json.dumps(self.languages_with_resources)
-        self.write_to_file(self.userInfo.repo_folder_name + '/LanguagesWithResources.json', serialized)
-        self.add_and_commit_to_repo(self.userInfo.repo_folder_name + '/LanguagesWithResources.json')
+        languages_with_resources_file_name = os.path.join(self.userInfo.repo_folder_name, 'LanguagesWithResources.json')
+        self.write_to_file(languages_with_resources_file_name, serialized)
+        self.add_and_commit_to_repo(languages_with_resources_file_name)
         self.detect_changes(shortcuts, new_files, language_resources)
         self.repo.remotes.origin.push()
 
@@ -355,7 +360,7 @@ class Processor:
         except ConnectionError:
             print("The online repository is currently unavailable.")
             return
-        print('successfully got repository')
+        print('Successfully cloned the github repository.')
         if not self.has_internet():
             print("The mediawiki server is currently unavailable.")
             return
@@ -370,7 +375,6 @@ class Processor:
         url = "http://" + self.userInfo.resource_server + "/mediawiki/index.php/Special:Filepath/"
         self.get_actual_pdf_or_odt_files(url, resources, shorts, ".pdf", "PDF")
         self.get_actual_pdf_or_odt_files(url, resources, shorts, ".odt", "ODT")
-        print(self.languages_with_resources)
         print("Update successful!")
 
 
