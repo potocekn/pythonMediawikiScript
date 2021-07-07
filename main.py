@@ -20,7 +20,7 @@ class UserInfo:
     resource_server: str
 
     def __init__(self, repo_folder_name, repo_url, resource_server):
-        dir_path = os.path.dirname(os.path.realpath(__file__))
+        dir_path = os.path.dirname(os.path.realpath(__file__))    
         self.repo_folder_name = os.path.join(dir_path, repo_folder_name)
         self.repo_URL = repo_url
         self.resource_server = resource_server
@@ -44,12 +44,11 @@ class Processor:
     # Method used for adding and committing of new files or changed files to the repository.
     def add_and_commit_to_repo(self, file_name):
         dir_path = os.path.dirname(os.path.realpath(__file__))
+        print(dir_path)
         new_name = os.path.join(dir_path, file_name)
         print(new_name)
         print(self.repo)
         self.repo.index.add(new_name)
-        self.repo.index.commit(' content changed')
-        self.repo.remotes.origin.push()
 
     # Method that saves given content to the file with given file name.
     def write_to_file(self, file, what_to_write):
@@ -310,7 +309,7 @@ class Processor:
         self.write_to_file(languages_with_resources_file_name, serialized)
         self.add_and_commit_to_repo(languages_with_resources_file_name)
         self.detect_changes(shortcuts, new_files, language_resources)
-        self.repo.remotes.origin.push()
+        # self.repo.remotes.origin.push()
 
     # Method for saving file into a specified language and format folder with given file name.
     def save_file(self, content, language, format, name):
@@ -374,6 +373,12 @@ class Processor:
         url = "http://" + self.userInfo.resource_server + "/mediawiki/index.php/Special:Filepath/"
         self.get_actual_pdf_or_odt_files(url, resources, shorts, ".pdf", "PDF")
         self.get_actual_pdf_or_odt_files(url, resources, shorts, ".odt", "ODT")
+        # self.repo.remotes.origin.push()
+        print("before commit")
+        self.repo.index.commit(' content changed')
+        print("before push")
+        origin = self.repo.remote(name="origin")
+        origin.push()
         print("Update successful!")
 
 
