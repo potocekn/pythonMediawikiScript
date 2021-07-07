@@ -20,7 +20,7 @@ class UserInfo:
     resource_server: str
 
     def __init__(self, repo_folder_name, repo_url, resource_server):
-        dir_path = os.path.dirname(os.path.realpath(__file__))    
+        dir_path = os.path.dirname(os.path.realpath(__file__))
         self.repo_folder_name = os.path.join(dir_path, repo_folder_name)
         self.repo_URL = repo_url
         self.resource_server = resource_server
@@ -44,7 +44,6 @@ class Processor:
     # Method used for adding and committing of new files or changed files to the repository.
     def add_and_commit_to_repo(self, file_name):
         dir_path = os.path.dirname(os.path.realpath(__file__))
-        print(dir_path)
         new_name = os.path.join(dir_path, file_name)
         print(new_name)
         print(self.repo)
