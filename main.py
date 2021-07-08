@@ -42,12 +42,9 @@ class Processor:
             raise AttributeError()
 
     # Method used for adding and committing of new files or changed files to the repository.
-    def add_and_commit_to_repo(self, file_name):
-        dir_path = os.path.dirname(os.path.realpath(__file__))
-        print(dir_path)
-        new_name = os.path.join(dir_path, file_name)
-        print(new_name)
-        print(self.repo)
+    def add_to_repo(self, file_name):
+        dir_path = os.path.dirname(os.path.realpath(__file__))        
+        new_name = os.path.join(dir_path, file_name)        
         self.repo.index.add(new_name)
 
     # Method that saves given content to the file with given file name.
@@ -71,7 +68,7 @@ class Processor:
             file_exists = path.exists(file_name)
             self.write_to_file(file_name, serialized)
             if not file_exists:
-                self.add_and_commit_to_repo(file_name)
+                self.add_to_repo(file_name)
             return extracted
         else:
             return []
@@ -98,7 +95,7 @@ class Processor:
             file_exists = path.exists(file_name)
             self.write_to_file(file_name, serialized)
             if not file_exists:
-                self.add_and_commit_to_repo(file_name)
+                self.add_to_repo(file_name)
             return extracted
         else:
             return []
@@ -279,7 +276,7 @@ class Processor:
             changes_and_versions = self.get_versions(file, changes, rest)
             with open(file, 'w') as f:
                 json.dump(changes_and_versions, f)
-            self.add_and_commit_to_repo(file)
+            self.add_to_repo(file)
         self.repo.index.commit(' content changed')
 
     # Method for downloading the actual versions of the HTML pages of resources for each language that is available
@@ -302,21 +299,20 @@ class Processor:
                         dir_path = os.path.dirname(os.path.realpath(__file__))
                         new_name = re.sub(self.userInfo.repo_folder_name + '/', '', exists)
                         new_files.append(new_name)
-                        self.add_and_commit_to_repo(os.path.join(dir_path, exists))
+                        self.add_to_repo(os.path.join(dir_path, exists))
                     language_resources.append(file_name)
         serialized = json.dumps(self.languages_with_resources)
         languages_with_resources_file_name = os.path.join(self.userInfo.repo_folder_name, 'LanguagesWithResources.json')
         self.write_to_file(languages_with_resources_file_name, serialized)
-        self.add_and_commit_to_repo(languages_with_resources_file_name)
+        self.add_to_repo(languages_with_resources_file_name)
         self.detect_changes(shortcuts, new_files, language_resources)
-        # self.repo.remotes.origin.push()
 
     # Method for saving file into a specified language and format folder with given file name.
     def save_file(self, content, language, format, name):
         full_name = os.path.join(self.userInfo.repo_folder_name, language, format, name)
         with open(full_name, 'wb') as f:
             f.write(content)
-            self.add_and_commit_to_repo(full_name)
+            self.add_to_repo(full_name)
 
     # Method for downloading and saving the PDF and ODT files.
     def get_actual_pdf_or_odt_files(self, url, resources_list, shortcuts, format, format_folder):
@@ -330,7 +326,7 @@ class Processor:
         changed_files = [item.a_path for item in self.repo.index.diff(None)]
         for f in changed_files:
             full_file_name = os.path.join(self.userInfo.repo_folder_name, f)
-            self.add_and_commit_to_repo(full_file_name)
+            self.add_to_repo(full_file_name)
 
     # Method for getting a list of shortcuts from the list of full language names.
     def get_language_shortcuts(self, language_names):
@@ -372,11 +368,8 @@ class Processor:
         self.get_actual_html_files(resources, shorts)
         url = "http://" + self.userInfo.resource_server + "/mediawiki/index.php/Special:Filepath/"
         self.get_actual_pdf_or_odt_files(url, resources, shorts, ".pdf", "PDF")
-        self.get_actual_pdf_or_odt_files(url, resources, shorts, ".odt", "ODT")
-        # self.repo.remotes.origin.push()
-        print("before commit")
-        self.repo.index.commit(' content changed')
-        print("before push")
+        self.get_actual_pdf_or_odt_files(url, resources, shorts, ".odt", "ODT")        
+        self.repo.index.commit(' content changed')        
         origin = self.repo.remote(name="origin")
         origin.push()
         print("Update successful!")
