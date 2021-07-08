@@ -9,7 +9,7 @@ import os
 from os import path
 from iso639 import languages
 import re
-import http.client as httplib
+import http.client
 
 
 # A class that holds all necessary information from user configuration such as the URL to the github repository,
@@ -338,7 +338,7 @@ class Processor:
 
     # Method to determine if there is an Internet connection.
     def has_internet(self):
-        conn = httplib.HTTPConnection(self.userInfo.resource_server, timeout=5)
+        conn = http.client.HTTPConnection(self.userInfo.resource_server, timeout=5)
         try:
             conn.request("HEAD", "/")
             conn.close()
